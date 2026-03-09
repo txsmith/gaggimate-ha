@@ -42,46 +42,6 @@ A Home Assistant custom integration for the [GaggiMate](https://github.com/jnieb
 | `sensor.gaggimate_pressure` | Sensor | Current group head pressure (bar) |
 | `select.gaggimate_mode` | Select | Operating mode |
 
-## Dashboard Card
-
-A simple card using [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom):
-
-```yaml
-type: vertical-stack
-cards:
-  - type: horizontal-stack
-    cards:
-      - type: custom:mushroom-entity-card
-        entity: sensor.gaggimate_current_temperature
-        name: Temp
-        icon: mdi:thermometer
-        icon_color: orange
-        primary_info: state
-        secondary_info: name
-      - type: custom:mushroom-entity-card
-        entity: sensor.gaggimate_target_temperature
-        name: Target
-        icon: mdi:thermometer-chevron-up
-        icon_color: red
-        primary_info: state
-        secondary_info: name
-      - type: custom:mushroom-entity-card
-        entity: sensor.gaggimate_pressure
-        name: Pressure
-        icon: mdi:gauge
-        icon_color: blue
-        primary_info: state
-        secondary_info: name
-  - type: custom:mushroom-entity-card
-    entity: select.gaggimate_mode
-    name: Mode
-    icon: mdi:coffee-maker
-    icon_color: brown
-    tap_action:
-      action: more-info
-    fill_container: true
-```
-
 ## License
 
 MIT

@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to GaggiMate",
+        "description": "Enter the hostname or IP address of your GaggiMate device.",
+        "data": {
+          "host": "Host"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to GaggiMate. Check the hostname and ensure the device is powered on."
+    },
+    "abort": {
+      "already_configured": "This GaggiMate device is already configured."
+    }
+  }
+}

@@ -110,3 +110,13 @@ class GaggiMateCoordinator:
         except Exception as err:
             _LOGGER.error("GaggiMate: failed to set mode: %s", err)
             raise
+
+    async def async_flush(self) -> None:
+        """Send a flush request to the device."""
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.ws_connect(self.ws_url) as ws:
+                await ws.send_str(json.dumps({"tp": "req:flush:start"}))
+        except Exception as err:
+            _LOGGER.error("GaggiMate: failed to start flush: %s", err)
+            raise

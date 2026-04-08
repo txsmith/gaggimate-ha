@@ -153,22 +153,16 @@ class GaggiMateCoordinator:
         await self.async_request({"tp": "req:profiles:select", "id": profile_id})
         await self.async_refresh_profiles()
 
+    async def async_send(self, data: dict) -> None:
+        """Send a message on the persistent WS connection."""
+        if not self._ws or self._ws.closed:
+            raise ConnectionError("Not connected to GaggiMate")
+        await self._ws.send_str(json.dumps(data))
+
     async def async_set_mode(self, mode: int) -> None:
         """Send a mode change request to the device."""
-        session = async_get_clientsession(self.hass)
-        try:
-            async with session.ws_connect(self.ws_url) as ws:
-                await ws.send_str(json.dumps({"tp": "req:change-mode", "mode": mode}))
-        except Exception as err:
-            _LOGGER.error("GaggiMate: failed to set mode: %s", err)
-            raise
+        await self.async_send({"tp": "req:change-mode", "mode": mode})
 
     async def async_flush(self) -> None:
         """Send a flush request to the device."""
-        session = async_get_clientsession(self.hass)
-        try:
-            async with session.ws_connect(self.ws_url) as ws:
-                await ws.send_str(json.dumps({"tp": "req:flush:start"}))
-        except Exception as err:
-            _LOGGER.error("GaggiMate: failed to start flush: %s", err)
-            raise
+        await self.async_send({"tp": "req:flush:start"})

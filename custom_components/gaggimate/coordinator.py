@@ -88,6 +88,13 @@ class GaggiMateCoordinator:
 
             await asyncio.sleep(RECONNECT_DELAY)
 
+    async def _load_profiles_on_connect(self) -> None:
+        """Load profiles once the message loop is running."""
+        try:
+            await self.async_refresh_profiles()
+        except Exception as err:
+            _LOGGER.warning("GaggiMate: failed to load profiles: %s", err)
+
     async def _connect(self) -> None:
         """Connect to WebSocket and process incoming events."""
         session = async_get_clientsession(self.hass)
@@ -95,11 +102,8 @@ class GaggiMateCoordinator:
             self._ws = ws
             _LOGGER.info("GaggiMate: connected to %s", self.ws_url)
 
-            # Fetch profiles on connect
-            try:
-                await self.async_refresh_profiles()
-            except Exception as err:
-                _LOGGER.warning("GaggiMate: failed to load profiles: %s", err)
+            # Schedule profile load after the message loop starts
+            self.hass.async_create_task(self._load_profiles_on_connect())
 
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:

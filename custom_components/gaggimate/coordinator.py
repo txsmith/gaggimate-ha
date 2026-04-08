@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import uuid
 from typing import Any, Callable
 
 import aiohttp
@@ -13,6 +14,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 _LOGGER = logging.getLogger(__name__)
 
 RECONNECT_DELAY = 5  # seconds
+REQUEST_TIMEOUT = 30  # seconds
 
 
 class GaggiMateCoordinator:
@@ -22,9 +24,12 @@ class GaggiMateCoordinator:
         self.hass = hass
         self.host = host
         self.data: dict[str, Any] = {}
+        self.profiles: list[dict[str, Any]] = []
         self._listeners: list[Callable[[], None]] = []
         self._task: asyncio.Task | None = None
         self._available = False
+        self._ws: aiohttp.ClientWebSocketResponse | None = None
+        self._pending_requests: dict[str, asyncio.Future] = {}
 
     @property
     def ws_url(self) -> str:
@@ -87,19 +92,62 @@ class GaggiMateCoordinator:
         """Connect to WebSocket and process incoming events."""
         session = async_get_clientsession(self.hass)
         async with session.ws_connect(self.ws_url, heartbeat=30) as ws:
+            self._ws = ws
             _LOGGER.info("GaggiMate: connected to %s", self.ws_url)
+
+            # Fetch profiles on connect
+            try:
+                await self.async_refresh_profiles()
+            except Exception as err:
+                _LOGGER.warning("GaggiMate: failed to load profiles: %s", err)
+
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     try:
                         payload = json.loads(msg.data)
                     except json.JSONDecodeError:
                         continue
+
+                    # Route responses to pending requests
+                    rid = payload.get("rid")
+                    if rid and rid in self._pending_requests:
+                        self._pending_requests[rid].set_result(payload)
+                        continue
+
                     if payload.get("tp") == "evt:status":
                         self._available = True
                         self.data = payload
                         self._notify()
                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                     break
+            self._ws = None
+
+    async def async_request(self, data: dict) -> dict:
+        """Send a request on the persistent WS and wait for a matching response."""
+        if not self._ws or self._ws.closed:
+            raise ConnectionError("Not connected to GaggiMate")
+
+        rid = str(uuid.uuid4())
+        data["rid"] = rid
+        future: asyncio.Future = self.hass.loop.create_future()
+        self._pending_requests[rid] = future
+
+        try:
+            await self._ws.send_str(json.dumps(data))
+            return await asyncio.wait_for(future, timeout=REQUEST_TIMEOUT)
+        finally:
+            self._pending_requests.pop(rid, None)
+
+    async def async_refresh_profiles(self) -> None:
+        """Fetch the profile list from the device."""
+        response = await self.async_request({"tp": "req:profiles:list"})
+        self.profiles = response.get("profiles", [])
+        self._notify()
+
+    async def async_select_profile(self, profile_id: str) -> None:
+        """Select a profile by ID."""
+        await self.async_request({"tp": "req:profiles:select", "id": profile_id})
+        await self.async_refresh_profiles()
 
     async def async_set_mode(self, mode: int) -> None:
         """Send a mode change request to the device."""
